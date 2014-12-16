@@ -76,11 +76,13 @@ void * sendMessage(void *arg)
 
 		if(!strcasecmp(inputMessage, "q\n"))
 		{
-			close(socket);
+			if(shutdown(socket, SHUT_WR))
+				perror("shutdown() error");
+
 			break;
 		}
 
-		//2번째 인자인 출력 양식에 따라 common.h에 있는 TOTAL_MESSAGE_LENGTH값에
+		//sprintf() 2번째 인자인 출력 양식에 따라 common.h에 있는 TOTAL_MESSAGE_LENGTH값에
 		//추가적인 공간을 제공해야 message의 index를 초과하지 않도록 할 수 있다
 		//별로 좋지 못한 모양으로 보임
 		//출력을 receiveMessage에서 담당하도록 하는 방식으로 바꾸는 것이 좋을 것 같다.
@@ -92,9 +94,8 @@ void * sendMessage(void *arg)
 		//'\0'을 포함해 메시지를 전달한다
 		if(write(socket, message, strlen(message)+1) == -1)
 			perror("message write() error");
-
-		fflush(stdout);
 	}
+	close(socket);
 	return (void*)NULL;
 }
 
@@ -117,5 +118,6 @@ void * receiveMessage(void *arg)
 		if(fputs(message, stdout) == EOF)
 			perror("fputs() error");
 	}
+
 	return (void*)NULL;
 }

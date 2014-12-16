@@ -28,7 +28,7 @@
 // +5는 [ ], :, '공백'에 의한 부분, -1은 '\0'문자 갯수 감소로 인한 부분 
 #define TOTAL_MESSAGE_LENGTH (MAX_CHATNAME_LENGTH) + (MAX_MESSAGE_LENGTH) + 5 - 1
 
-#define EPOLL_SIZE 30
+#define EPOLL_SIZE 1 + 30 // serverSocketNum + clientSocketNum
 
 #define setNonblockingMode(fd)						\
 	do {											\

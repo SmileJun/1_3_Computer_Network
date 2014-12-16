@@ -42,7 +42,6 @@ int main(int argc, char *argv[])
 	if(setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (void*)&reuseAddrOption, optionSize) == -1)
 		perror("setsockopt() error");	
 
-	memset(&serverAddress, 0, sizeof(serverAddress));
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
 	serverAddress.sin_port = htons(atoi(argv[1]));
@@ -75,7 +74,6 @@ int main(int argc, char *argv[])
 	if(clientSocketForServer == -1)
 		perror("clientSocketForServer socket() error");
 	
-	memset(&clientAddressForServer, 0, sizeof(clientAddressForServer));
 	clientAddressForServer.sin_family = AF_INET;
 	clientAddressForServer.sin_addr.s_addr = htonl(INADDR_ANY);
 	clientAddressForServer.sin_port = htons(atoi(argv[1]));
@@ -148,15 +146,16 @@ void * epollServer(void *arg)
 	int clientSocket;
 	struct sockaddr_in clientAddress;
 	socklen_t clientAddressSize;
-	int clientSocketNum = 0;
 
 	struct epoll_event * epollEvents
 		= malloc(sizeof(struct epoll_event)*EPOLL_SIZE);
 	if(epollEvents == NULL)
 		perrorAndExit("epollEvents malloc() error");
-
 	struct epoll_event event;
 	int eventNum = 0;
+	
+	int clientSocketNum = 0;
+	int maxClientSocketNum = 0;
 	int readMessageLength = 0;
 	int i, j;
 
@@ -180,10 +179,10 @@ void * epollServer(void *arg)
 				clientAddressSize = sizeof(clientAddress);
 
 				// 3 : epfd, 4 : serverSocket
+				// ..??
 				// clientSocketForServer가 5번 fd가 아니라 6번에 들어가버린다.
-				// 도저히 이해를 못하겠다
-				// 이 6번(서버가 쓰는 클라이언트)을 닫고
-				// 외부 클라이언트로 접속시 그 클라이언트가 5번 fd벊로를 받는다
+				// 어쩔 수 없이 mychatting_server.h 에 CLIENT_FD_START_INDEX는 일단 6으로 등록하였다
+				// 원인 불명 ...ㅜㅜ
 				clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddress, &clientAddressSize);
 				if(clientSocket == -1)
 				{
@@ -198,7 +197,7 @@ void * epollServer(void *arg)
 					perrorAndExit("clientSocket epoll_ctl() error");
 
 				printf("connected client: %d \n", clientSocket);
-				clientSocketNum++;
+				increaseSocketNum(&clientSocketNum, &maxClientSocketNum);
 			}
 			else
 			{
@@ -210,7 +209,7 @@ void * epollServer(void *arg)
 					if(readMessageLength == 0)
 					{
 						epoll_ctl(epfd, EPOLL_CTL_DEL, clientSocket, NULL);
-						close(clientSocket);
+						close(clientSocket);	
 						printf("closed client: %d \n", clientSocket);
 						clientSocketNum--;
 						break;
@@ -224,13 +223,16 @@ void * epollServer(void *arg)
 					}
 					else
 					{
-						for(j=CLIENT_FD_START_INDEX; j < CLIENT_FD_START_INDEX + clientSocketNum; j++)
+						// 현재 client의 최소 ~ 최대 범위를 기반으로
+						// 모든 clientSocket에게 메시지를 보내고 있는데
+						// close된 소켓에게도 write()를 수행하는 문제가 있다.
+						// skip하는 별도의 방법을 추후 생각해볼 것
+						for(j=CLIENT_FD_START_INDEX; j < CLIENT_FD_START_INDEX + maxClientSocketNum; j++)
 						{
-							if(clientSocket != j)
-							{
-								if(write(j, message, readMessageLength) == -1)
-									perror("message write() error");
-							}
+							if(clientSocket == j)
+								continue;
+							
+							writeMessageToClient(&j, message, readMessageLength);
 						}
 					}
 				}
@@ -246,3 +248,31 @@ int isEndOfServer(void)
 	return FALSE;
 }
 
+void increaseSocketNum(int *clientSocketNum, int *maxClientSocketNum)
+{
+	if(clientSocketNum == NULL || maxClientSocketNum == NULL)
+		return;
+
+	(*clientSocketNum)++;
+	if(*clientSocketNum > *maxClientSocketNum)
+		(*maxClientSocketNum)++;
+
+	if(*clientSocketNum > EPOLL_SIZE)
+		perror("EPOLL_SIZE over");
+}
+
+
+void writeMessageToClient(int *clientSocket, const char *message, int messageLength)
+{
+	if(clientSocket == NULL || message == NULL)
+		return;
+
+	if(write(*clientSocket, message, messageLength) == -1)
+	{
+		// close된 소켓에 의한 경우는 일단 별도의 에러 메시지를 출력하지 않는
+		if(errno == EBADF)
+			return;
+
+		perror("message write() error");
+	}
+}
