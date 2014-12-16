@@ -5,7 +5,9 @@
  client
 
 - 사용법
+
  서버 : ./server <port> <chatName>
+
  클라이언트 : ./client <IP> <port> <chatName>
 
 - bug report
