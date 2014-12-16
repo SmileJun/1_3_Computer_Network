@@ -6,11 +6,12 @@
 
 - 사용법
 
- 서버 : ./server <port> <chatName>
+ 서버 : ./server {port} {chatName}
 
- 클라이언트 : ./client <IP> <port> <chatName>
+ 클라이언트 : ./client {IP} {port} {chatName}
 
 - bug report
+
 현재 최초로 접속되는 client인 clientSocketForServer가 5번이 아니라
 6번 fd를 가지게 되면서 발생하는 에러 상황
 
