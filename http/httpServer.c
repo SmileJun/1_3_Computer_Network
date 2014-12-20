@@ -10,11 +10,37 @@ int main(int argc, char * argv[])
 
 	int serverSocket, clientSocket;
 	struct sockaddr_in serverAddress, clientAddress;
-	int clientAddressSize;
+	socklen_t clientAddressSize;
 	char buf[BUF_SIZE];
 
 	pthread_t requestHandlerId;
 
+	serverSocket = socket(PF_INET, SOCK_STREAM, 0);
+	if(serverSocket == -1)
+		perrorAndExit("serverSocket() error");
+	
+	serverAddress.sin_family = AF_INET;
+	serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+	serverAddress.sin_port = htons(atoi(argv[1]));
+	if(bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
+		perrorAndExit("bind() error");
+
+	if(listen(serverSocket, LISTEN_QUEUE_SIZE) == -1)
+		perrorAndExit("listen() error");
+	
+	while(!isEndOfServer())
+	{
+		clientAddressSize = sizeof(clientAddress);
+		clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddress, &clientAddressSize);
+		printf("Connection Request : %s:%d\n", inet_ntoa(clientAddress.sin_addr), ntohs(clientAddress.sin_port));
+		
+		if(pthread_create(&requestHandlerId, NULL, requestHandler, &clientSocket) != 0)
+			perror("pthread_create() error");
+		if(pthread_detach(requestHandlerId) != 0)
+			perror("pthread_detach() error");
+	}
+
+	close(serverSocket);
 	return 0;
 }
 
@@ -87,3 +113,61 @@ void perrorAndExit(const char * str)
 	perror(str);
 	exit(1);
 }
+
+int isEndOfServer(void)
+{
+	return FALSE;
+}
+
+void * requestHandler(void * arg)
+{
+	int clientSocket = *((int*)arg);
+	char requestLine[SMALL_BUF];
+	FILE * clientRead;
+	FILE * clientWrite;
+
+	char method[10];
+	char contentType[15];
+	char fileName[30];
+
+	clientRead = fdopen(clientSocket, "r");
+	clientWrite = fdopen(clientSocket, "w");
+	fgets(requestLine, SMALL_BUF, clientRead);
+
+	if(strstr(requestLine, "HTTP/") == NULL)
+	{
+		sendError(clientWrite);
+		fclose(clientRead);
+		fclose(clientWrite);
+		return;
+	}
+
+	strcpy(method, strtok(requestLine, " /"));
+	if(strcmp(method, "GET") != 0)
+	{
+		sendError(clientWrite);
+		fclose(clientRead);
+		fclose(clientWrite);
+		return;
+	}
+	strcpy(fileName, strtok(NULL, " /"));
+	strcpy(contentType, getContentType(fileName));
+
+	fclose(clientRead);
+	sendData(clientWrite, contentType, fileName);
+}
+
+void sendData(FILE * fp, char * fileContentType, char * fileName)
+{
+	return (char*)NULL;
+}
+
+char * getContentType(char * file)
+{
+	return (char*)NULL;
+}
+
+void sendError(FILE * fp)
+{
+}
+

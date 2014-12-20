@@ -15,7 +15,7 @@
 #define MIN_PORT_NUM 1024
 #define MAX_PORT_NUM 65535
 
-#define LISTEN_QUEUE_SIZE 10
+#define LISTEN_QUEUE_SIZE 20
 #define BUF_SIZE 1024
 #define SMALL_BUF 100
 
@@ -25,9 +25,10 @@ int isNum(const char * str);
 int isValidPortRange(const char * str);
 void perrorAndExit(const char * str);
 
+int isEndOfServer(void);
 void * requestHandler(void * arg);
 void sendData(FILE * fp, char * ct, char * fileName);
-char * contentType(char * file);
+char * getContentType(char * file);
 void sendError(FILE * fp);
 
 #endif
